@@ -2,11 +2,14 @@ import re
 import subprocess
 import pandas as pd
 import numpy as np
+
 try:
     from StringIO import StringIO as BytesIO
 except ImportError:
     from io import BytesIO
 
+np.float_ = pd.Float64Dtype()
+np.int_ = pd.Int64Dtype()
 
 TABLE_RE = re.compile("CREATE TABLE \[(\w+)\]\s+\((.*?\));",
                       re.MULTILINE | re.DOTALL)
@@ -19,7 +22,7 @@ def list_tables(rdb_file, encoding="latin-1"):
     :param rdb_file: The MS Access database file.
     :param encoding: The content encoding of the output. I assume `latin-1`
         because so many of MS files have that encoding. But, MDBTools may
-        actually be UTF-8.
+        actually be UTF-8. Use UTF-8 to support German umlaut characters (ä, ö, ü).
     :return: A list of the tables in a given database.
     """
     tables = subprocess.check_output(['mdb-tables', rdb_file]).decode(encoding)
@@ -124,4 +127,7 @@ def read_table(rdb_file, table_name, *args, **kwargs):
 
     cmd = ['mdb-export', rdb_file, table_name]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    return pd.read_csv(proc.stdout, *args, **kwargs)
+
+    # encoding_errors='replace' -> Replace with a replacement marker.
+    # On encoding, use ? (ASCII character). On decoding, use � (U+FFFD, the official REPLACEMENT CHARACTER).
+    return pd.read_csv(proc.stdout, *args, **kwargs, encoding_errors='replace')
